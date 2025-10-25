@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect # web framework
-from flask_sqlalchemy import SQLAlchemy # database operations
-from datetime import datetime # date and time handling
+from models import db, Post  # Import from db and data model from models.py
 import cloudinary # image hosting
 import cloudinary.uploader 
 from cloudinary.utils import cloudinary_url
@@ -35,8 +34,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Avoids a warning
 
-# Create SQLAlchemy instance
-db = SQLAlchemy(app)
+# Initialize db with app
+db.init_app(app)
 
 # Define Data Model (Data Layer Interface)
 # Defines the database table structure, each post has ID, title, current date, content, and optional image
