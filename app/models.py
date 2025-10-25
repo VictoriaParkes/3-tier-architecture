@@ -4,6 +4,8 @@ from datetime import datetime # date and time handling
 # Create SQLAlchemy instance
 db = SQLAlchemy()
 
+# Define Data Model (Data Layer Interface)
+# Defines the database table structure, each post has ID, title, current date, content, and optional image
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
