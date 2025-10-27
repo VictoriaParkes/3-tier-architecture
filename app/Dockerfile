@@ -1,7 +1,7 @@
 # ARG: Makes Python version configurable at build time
 # slim: Smaller base image (saves ~800MB vs full Python image)
-ARG PYTHON_VERSION=3.9.6
-FROM python:${PYTHON_VERSION}-slim as base
+ARG PYTHON_VERSION=3.9
+FROM python:${PYTHON_VERSION}-alpine as base
 
 # Sets /app as the working directory inside the container
 # All subsequent commands run from this directory
@@ -15,20 +15,35 @@ WORKDIR /app
 #but dependencies don't, Docker reuses the cached pip install
 # layer (faster rebuilds)
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create a new user instead of running as root user
+RUN adduser -D appuser
 
 # Application Code
 # Copies all remaining files from build context to /app
 # Done after dependencies so code changes don't invalidate
 # the pip cache layer
-COPY . .
+# COPY . .
+# change the ownership of all files and dirs in /app to the appuser account
+# RUN chown -R appuser:appuser /app
+
+# Ownership set during copy operation
+COPY --chown=appuser:appuser . .
+
+# Switch to app user
+USER appuser
 
 # Documents that the app listens on port 5000
 # This is documentation only, doesn't actually publish the port
 # Still need -p 5000:5000 when running the container
 EXPOSE 5000
 
-# Exec form (preferred): ["python", "app.py"]
+# Health check to monitor Flask application
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000')" || exit 1
+
+# Execute
 # Runs when container starts
 # Can be overridden at runtime
 CMD ["python", "app.py"]
