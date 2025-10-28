@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <title>Blog</title>
 </head>
 <body>
-    <nav>
+    <nav id="navigation">
         <ul>
             <li>
-                <a href="/" class="active">Home</a>
+                <a href="/">Home</a>
             </li>
             <li>
                 <a href="/create">Create</a>
             </li>
         </ul>
     </nav>
-    <main class="container mt-3">
+    <main>
         {% block content %}
         {% endblock %}
     </main>
