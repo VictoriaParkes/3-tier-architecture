@@ -2,12 +2,9 @@ from flask import Flask, render_template, request, redirect # web framework
 from models import db, Post  # Import from db and data model from models.py
 import cloudinary # image hosting
 import cloudinary.uploader 
-from cloudinary.utils import cloudinary_url
 import sys
 # Access environment variables
 import os
-if os.path.isfile('env.py'):
-    import env
 
 # Create Flask web application instance
 # Flask(__name__)
@@ -30,10 +27,10 @@ if os.path.isfile('env.py'):
 # This single line essentially initializes entire web application.
 app = Flask(__name__)
 
-# Configure SQLite database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////app/data/site.db' # specify the database path explicitly
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Avoids a warning
+# Configure database with fallback
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+  # Avoids a warning
 
 # Initialize db with app
 db.init_app(app)
@@ -50,60 +47,82 @@ cloudinary.config(
 # Displays all posts (READ operation)
 @app.route("/", methods=['GET'])
 def index():
-    # query database to retrieve all records from 'Post' model/table
-    # stores the results in the 'posts' variable
-    posts = Post.query.all()
-    # render 'index.html' template and pass it 'posts' variable
-    # template can then loop through and display
-    return render_template("index.html", posts=posts)
+    print("index route called")
+    try:
+        print("Started index")
+        # query database to retrieve all records from 'Post' model/table
+        # stores the results in the 'posts' variable
+        posts = Post.query.all()
+        print(f"✓ Retrieved {len(posts)} posts")
+        # render 'index.html' template and pass it 'posts' variable
+        # template can then loop through and display
+        return render_template("index.html", posts=posts)
+    except Exception as e:
+        print(f"✗ Error in index route: {e}")
+        return f"Database error: {e}", 500
 
 # Handles /create URL for both GET (display form) and POST (process form) requests
 @app.route("/create", methods=['GET', 'POST'])
 def create():
     # Extracts form data when submitted
     if request.method == 'POST':
-        title = request.form['title']
-        content = request.form['content']
-        
-        # check if image was uploaded
-        # if yes upload to cloudinary and get secure URL
-        # if no image URL remains None
-        image_url = None
-        if 'image' in request.files and request.files['image'].filename:
-            image = request.files['image']
-            try:
+        try:
+            title = request.form['title']
+            content = request.form['content']
+            
+            # check if image was uploaded
+            # if yes upload to cloudinary and get secure URL
+            # if no image URL remains None
+            image_url = None
+            if 'image' in request.files and request.files['image'].filename:
+                image = request.files['image']
                 upload_result = cloudinary.uploader.upload(image)
                 image_url = upload_result['secure_url']
-            except Exception as e:
-                print(f"Failed to upload image: {e}")
-                return render_template("create.html", error="Failed to upload image. Please try again.")
-        
-        # Creates new Post object with form data.
-        # Adds it to the database session.
-        # Commits the transaction to save
-        new_post = Post(title=title, content=content, image=image_url)
-        try:
+            # Creates new Post object with form data.
+            # Adds it to the database session.
+            # Commits the transaction to save
+            new_post = Post(title=title, content=content, image=image_url)
             db.session.add(new_post)
             db.session.commit()
+            print(f"✓ Created post: {title}")
+            return redirect('/')
         except Exception as e:
-            print(f"Failed to add post to db: {e}")
-            return render_template("create.html", error="Failed to create post. Please try again.")
+            print(f"✗ Error creating post: {e}")
+            return render_template("create.html", error=str(e))
         
-        # Redirects user back to homepage after successful post creation
-        return redirect('/')
-    
     return render_template("create.html")
+
+# Test database connection on startup
+def test_db_connection():
+    try:
+        with app.app_context():
+            db.create_all()
+            print("Database connected successfully")
+            return True
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+        sys.exit(1)
+
+@app.route("/health")
+def health():
+    return {"status": "healthy", "database": "connected"}, 200
+
+@app.route("/test")
+def test():
+    return "<h1>Flask is working!</h1>"
+
+@app.route('/<path:path>')
+def catch_all(path):
+    print(f"Catch-all route called with path: {path}")
+    return f"You requested: {path}"
 
 # Run the app and create database
 if __name__ == '__main__': # This is a Python idiom that checks if the script is being run directly (not imported as a module).
-    try:
-        # Create database tables if they don't exist
-        with app.app_context():  # Needed for DB operations
-            db.create_all()      # Creates the database and tables
+    if test_db_connection():
         # Starts the Flask development server
-        app.run(host='0.0.0.0', debug=False)
-    except Exception as e:
-        print(f"Failed to start app: {e}")
+        app.run(host='0.0.0.0', debug=True)
+    else:
+        print(f"Failed to start app.")
         sys.exit(1)  # Tell Docker/system the app failed to start
 
 """
