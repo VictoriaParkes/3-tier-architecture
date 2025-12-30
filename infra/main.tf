@@ -10,7 +10,7 @@ provider "aws" {
 # Create an ECR repository to store application images
 resource "aws_ecr_repository" "ecr" {
   name                 = var.ecr_name # name the repository
-  image_tag_mutability = "MUTABLE" # Allow image tag updates
+  image_tag_mutability = "IMMUTABLE" # Don't allow image tag updates
 
   # Enable security scanning on image uploads
   image_scanning_configuration {
@@ -26,9 +26,9 @@ module "vpc" {
   name = var.vpc_name # name the VPC
   cidr = var.vpc_cidr # Define CIDR range
 
-  azs             = ["eu-north-1a", "eu-north-1b", "eu-north-1c"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"] # Private subnets for secure app hosting
-  public_subnets  = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"] # Public subnets for load balancers
+  azs             = var.availability_zones
+  private_subnets = var.private_subnets_cidr # Private subnets for secure app hosting
+  public_subnets  = var.public_subnets_cidr # Public subnets for load balancers
 
   enable_nat_gateway = true # NAT gateways for outbound internet access
   enable_vpn_gateway = true # VPN gateway for secure encrypted connection between VPC and external networks
@@ -67,7 +67,7 @@ module "eks" {
   # Optional: Adds the current caller identity as an administrator via cluster access entry
   enable_cluster_creator_admin_permissions = true
 
-  vpc_id     = module.vpc.vpc_id
+  vpc_id     = module.vpc.vpc_id # Connect EKS cluster to the VPC network
   subnet_ids = module.vpc.private_subnets # Run on private subnets for security
 
   /*
