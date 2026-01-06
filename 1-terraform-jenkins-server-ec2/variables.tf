@@ -27,7 +27,7 @@ variable "vpc_cidr" {
 variable "allowed_cidr_blocks" {
   description = "CIDR blocks allowed to access ALB"
   type        = list(string)
-  default     = ["63.178.175.64/32"]  # Restricted to own IP
+  default     = ["pl-d3bc5fba"]  # Restricted to sg prefix list
 }
 
 variable "jenkins_instance_type" {
