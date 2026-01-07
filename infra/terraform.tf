@@ -1,18 +1,30 @@
-# Define the required providers in infrastructure
-# Specify which external plugins Terraform needs to manage
+# Configure Terraform to manage AWS and Kubernetes resources
 
-# Terraform-specific settings
 terraform {
-  # Declare AWS provider as a dependency
   required_providers {
+    # Manage AWS resources (EKS, VPC, IAM)
     aws = {
-      source  = "hashicorp/aws" # Points to the official AWS provider from HashiCorp's registry
-      version = "6.19.0"        # Specifies the version of the provider to use
+      source  = "hashicorp/aws"
+      version = "6.19.0"
     }
+    # Manage Kubernetes resources (pods, services, deployments)
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.38"
+    }
+    # Version constraints: AWS uses exact version, K8s allows patch updates
   }
 }
 
-# Ensures all team members use the same AWS provider version
-# Prevents breaking changes from automatic provider updates
-# This is typically the first file Terraform reads when running terraform init,
-# downloads the specified AWS provider plugin to manage cloud infrastructure.
+# Kubernetes Provider Config
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint # EKS cluster API server URL
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data) # Cluster's SSL certificate (base64 decoded)
+  
+  # dynamic authentication for K8s provider
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1" # Uses Kubernetes client authentication API v1beta1
+    command     = "aws" # Executes the aws CLI command
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name] # Runs aws eks get-token --cluster-name <cluster-name>
+  }
+}

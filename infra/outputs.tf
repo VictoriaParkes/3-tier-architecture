@@ -24,3 +24,19 @@ output "cluster_name" {
   description = "Kubernetes Cluster Name"
   value       = module.eks.cluster_name
 }
+
+# Jenkins-related outputs
+output "jenkins_role_arn" {
+  description = "ARN of the Jenkins IAM role"
+  value       = aws_iam_role.jenkins_role.arn
+}
+
+output "jenkins_namespace" {
+  description = "Jenkins namespace"
+  value       = kubernetes_namespace.jenkins.metadata[0].name
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for Jenkins to push images"
+  value       = aws_ecr_repository.ecr.repository_url
+}
