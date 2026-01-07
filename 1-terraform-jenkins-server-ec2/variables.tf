@@ -9,7 +9,7 @@
 variable "aws_region" {
   description = "AWS region for deployment"
   type        = string
-  default     = "eu-north-1"
+  default     = "us-east-1"
 }
 
 variable "project_name" {
@@ -36,10 +36,10 @@ variable "jenkins_instance_type" {
   default     = "t3.medium"
 }
 
-variable "acm_certificate_arn" {
-  description = "ARN of ACM certificate for HTTPS listener"
-  type        = string
-}
+# variable "acm_certificate_arn" {
+#   description = "ARN of ACM certificate for HTTPS listener"
+#   type        = string
+# }
 
 variable "use_cognito_auth" {
   description = "Use Cognito authentication (true) or OIDC (false)"

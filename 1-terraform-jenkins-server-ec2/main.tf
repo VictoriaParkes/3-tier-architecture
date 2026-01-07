@@ -124,7 +124,15 @@ resource "aws_security_group" "alb" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
+    prefix_list_ids = var.allowed_cidr_blocks
+  }
+
+  ingress {
+    description     = "HTTP from whitelisted IP"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    prefix_list_ids = var.allowed_cidr_blocks
   }
 
   egress {
@@ -368,7 +376,7 @@ resource "aws_lb_listener" "https_cognito" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = var.acm_certificate_arn
+  # certificate_arn   = var.acm_certificate_arn
 
   default_action {
     type = "authenticate-cognito"
@@ -397,7 +405,7 @@ resource "aws_lb_listener" "https_oidc" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = var.acm_certificate_arn
+  # certificate_arn   = var.acm_certificate_arn
 
   default_action {
     type = "authenticate-oidc"
