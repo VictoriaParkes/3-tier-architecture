@@ -5,26 +5,39 @@ terraform {
     # Manage AWS resources (EKS, VPC, IAM)
     aws = {
       source  = "hashicorp/aws"
-      version = "6.19.0"
+      version = "6.23.0"
     }
     # Manage Kubernetes resources (pods, services, deployments)
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.38"
     }
-    # Version constraints: AWS uses exact version, K8s allows patch updates
+
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
+
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.9"
+    }
   }
 }
 
-# Kubernetes Provider Config
+# provider "aws" {
+#   region = var.region
+# }
+
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint # EKS cluster API server URL
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data) # Cluster's SSL certificate (base64 decoded)
-  
-  # dynamic authentication for K8s provider
+  host = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
   exec {
-    api_version = "client.authentication.k8s.io/v1beta1" # Uses Kubernetes client authentication API v1beta1
-    command     = "aws" # Executes the aws CLI command
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name] # Runs aws eks get-token --cluster-name <cluster-name>
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
   }
 }
+
+provider "helm" {}
