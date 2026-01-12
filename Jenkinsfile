@@ -1,6 +1,10 @@
+@Library('github.com/releaseworks/jenkinslib') _
+
 pipeline {
     agent any
     
+    
+
     environment {
         AWS_REGION = 'eu-north-1'
         EKS_CLUSTER = 'blog-cluster'
