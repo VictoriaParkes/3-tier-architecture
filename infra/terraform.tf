@@ -7,7 +7,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws" # Points to the official AWS provider from HashiCorp's registry
-      version = "6.19.0"        # Specifies the version of the provider to use
+      version = "6.28.0"        # Specifies the version of the provider to use
     }
   }
 }
