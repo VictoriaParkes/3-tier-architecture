@@ -121,3 +121,224 @@ data "aws_caller_identity" "current" {}
 # Presentation Tier: Frontend/load balancers expose services via public subnets
 
 # This creates a production-ready, scalable, and secure containerized application platform.
+
+
+######################
+# Jenkins EC2 config #
+######################
+
+# Prefix security group
+
+resource "aws_security_group" "prefix_sg" {
+  name = "prefix-security-group"
+  description = "Allow HTTP traffic to load balancer"
+  vpc_id = module.vpc.vpc_id
+
+  tags = {
+    Name = "prefix-SG"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "prefix_ingress_rule" {
+  security_group_id = aws_security_group.prefix_sg.id
+
+  prefix_list_id = "pl-fca24795"
+  from_port = 80
+  ip_protocol = "tcp"
+  to_port = 80
+}
+
+resource "aws_vpc_security_group_egress_rule" "preffix_egress_rule" {
+  security_group_id = aws_security_group.prefix_sg.id
+
+  cidr_ipv4 = "0.0.0.0/0"
+  ip_protocol = "-1"
+}
+
+# Jenkins instance security group
+
+resource "aws_security_group" "jenkins_sg" {
+  name = "jenkins-security-group"
+  description = "Allow traffic from load balancer security group to jenkins instance"
+  vpc_id = module.vpc.vpc_id
+
+  tags = {
+    Name = "jenkins-SG"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "jenkins_ingress_rule" {
+  security_group_id = aws_security_group.jenkins_sg.id
+  
+  referenced_security_group_id = aws_security_group.prefix_sg.id
+  from_port = 80
+  ip_protocol = "tcp"
+  to_port = 80
+}
+
+resource "aws_vpc_security_group_egress_rule" "jenkins_egress_rule" {
+  security_group_id = aws_security_group.jenkins_sg.id
+
+  cidr_ipv4 = "0.0.0.0/0"
+  ip_protocol = "-1"
+}
+
+# public subnet for load balancer
+
+resource "aws_subnet" "LB_subnet_01" {
+  vpc_id = module.vpc.vpc_id
+  cidr_block = var.LB_subnet_cidr[0]
+  availability_zone = var.jenkins_AZ
+
+  tags = {
+    Name = "public-LB-subnet-01"
+  }
+}
+
+resource "aws_subnet" "LB_subnet_02" {
+  vpc_id = module.vpc.vpc_id
+  cidr_block = var.LB_subnet_cidr[1]
+  availability_zone = module.vpc.azs[1]
+
+  tags = {
+    Name = "public-LB-subnet-02"
+  }
+}
+
+# private subnet for jenkins instance
+resource "aws_subnet" "jenkins_subnet" {
+  vpc_id = module.vpc.vpc_id
+  cidr_block = var.jenkins_subnet_cidr
+  availability_zone = var.jenkins_AZ
+
+  tags = {
+    Name = "private-Jenkins-subnet"
+  }
+}
+
+# jenkins instance
+resource "aws_instance" "jenkins_ec2" {
+  subnet_id = aws_subnet.jenkins_subnet.id
+  ami = data.aws_ami.amazon_linux_2023.id
+  instance_type = "t3.micro"
+  vpc_security_group_ids = [aws_security_group.jenkins_sg.id]
+
+  user_data_base64 = base64encode(<<-EOF
+    #!/bin/bash
+    yum update -y
+    yum install -y nginx
+    systemctl start nginx
+    systemctl enable nginx
+    echo "<html><h1>Server 1</h1></html>" > /usr/share/nginx/html/index.html
+  EOF
+  )
+
+  tags = {
+    Name = "jenkins-server"
+  }
+}
+
+resource "aws_route_table" "public_RT" {
+  vpc_id = module.vpc.vpc_id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = module.vpc.igw_id
+  }
+
+  route {
+    cidr_block = var.vpc_cidr
+    gateway_id = "local"
+  }
+
+  tags = {
+    Name = "public-route-table"
+  }
+}
+
+resource "aws_route_table_association" "pub_sub_route_01" {
+  subnet_id = aws_subnet.LB_subnet_01.id
+  route_table_id = aws_route_table.public_RT.id
+}
+
+resource "aws_route_table_association" "pub_sub_route_02" {
+  subnet_id = aws_subnet.LB_subnet_02.id
+  route_table_id = aws_route_table.public_RT.id
+}
+
+resource "aws_route_table" "private_RT" {
+  vpc_id = module.vpc.vpc_id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    nat_gateway_id = module.vpc.natgw_ids[0]
+  }
+
+  route {
+    cidr_block = var.vpc_cidr
+    gateway_id = "local"
+  }
+
+  tags = {
+    Name = "private-route-table"
+  }
+}
+
+resource "aws_route_table_association" "prv_sub_route" {
+  subnet_id = aws_subnet.jenkins_subnet.id
+  route_table_id = aws_route_table.private_RT.id
+}
+
+resource "aws_lb" "jenkins_alb" {
+  load_balancer_type = "application"
+  name = "jenkins-alb"
+  internal = false
+  
+  subnets = [aws_subnet.LB_subnet_01.id, aws_subnet.LB_subnet_02.id]
+  security_groups = [aws_security_group.prefix_sg.id]
+
+  tags = {
+    Name = "jenkins-alb"
+  }
+}
+
+resource "aws_lb_target_group" "jenkins_alb_target_group" {
+  name = "jenkins-target-group"
+  port = 80
+  protocol = "HTTP"
+  vpc_id = module.vpc.vpc_id
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200"
+    path                = "/"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    unhealthy_threshold = 2
+  }
+}
+
+resource "aws_lb_target_group_attachment" "jenkins_alb_target_group_attachment" {
+  target_group_arn = aws_lb_target_group.jenkins_alb_target_group.arn
+  target_id = aws_instance.jenkins_ec2.id
+  port = 80
+}
+
+resource "aws_lb_listener" "jenkins_alb_listener" {
+  load_balancer_arn = aws_lb.jenkins_alb.arn
+  port = 80
+  protocol = "HTTP"
+
+  default_action {
+    type = "forward"
+    
+    forward {
+      target_group {
+        arn = aws_lb_target_group.jenkins_alb_target_group.arn
+      }
+    }
+  }
+}

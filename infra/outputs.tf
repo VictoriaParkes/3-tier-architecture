@@ -24,3 +24,8 @@ output "cluster_name" {
   description = "Kubernetes Cluster Name"
   value       = module.eks.cluster_name
 }
+
+output "jenkins_alb_dns" {
+  description = "DNS name of Jenkins ALB"
+  value       = aws_lb.jenkins_alb.dns_name
+}
