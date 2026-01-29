@@ -171,9 +171,9 @@ resource "aws_vpc_security_group_ingress_rule" "jenkins_ingress_rule" {
   security_group_id = aws_security_group.jenkins_sg.id
   
   referenced_security_group_id = aws_security_group.prefix_sg.id
-  from_port = 80
+  from_port = 8080
   ip_protocol = "tcp"
-  to_port = 80
+  to_port = 8080
 }
 
 resource "aws_vpc_security_group_egress_rule" "jenkins_egress_rule" {
@@ -225,11 +225,15 @@ resource "aws_instance" "jenkins_ec2" {
 
   user_data_base64 = base64encode(<<-EOF
     #!/bin/bash
-    yum update -y
-    yum install -y nginx
-    systemctl start nginx
-    systemctl enable nginx
-    echo "<html><h1>Server 1</h1></html>" > /usr/share/nginx/html/index.html
+    dnf update -y
+    wget -O /etc/yum.repos.d/jenkins.repo \
+    https://pkg.jenkins.io/rpm-stable/jenkins.repo
+    rpm --import https://pkg.jenkins.io/rpm-stable/jenkins.io-2026.key
+    dnf upgrade
+    dnf install java-21-amazon-corretto -y
+    dnf install jenkins -y
+    systemctl enable jenkins
+    systemctl start jenkins
   EOF
   )
 
@@ -304,7 +308,7 @@ resource "aws_lb" "jenkins_alb" {
 
 resource "aws_lb_target_group" "jenkins_alb_target_group" {
   name = "jenkins-target-group"
-  port = 80
+  port = 8080
   protocol = "HTTP"
   vpc_id = module.vpc.vpc_id
 
@@ -313,7 +317,7 @@ resource "aws_lb_target_group" "jenkins_alb_target_group" {
     healthy_threshold   = 2
     interval            = 30
     matcher             = "200"
-    path                = "/"
+    path                = "/login"
     port                = "traffic-port"
     protocol            = "HTTP"
     timeout             = 5
@@ -324,7 +328,7 @@ resource "aws_lb_target_group" "jenkins_alb_target_group" {
 resource "aws_lb_target_group_attachment" "jenkins_alb_target_group_attachment" {
   target_group_arn = aws_lb_target_group.jenkins_alb_target_group.arn
   target_id = aws_instance.jenkins_ec2.id
-  port = 80
+  port = 8080
 }
 
 resource "aws_lb_listener" "jenkins_alb_listener" {
